@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webkep-konverter"
+dynamic = ["version"]
+description = "Kötegelt WebP / AVIF képkonvertáló asztali alkalmazás és parancssori eszköz"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Pillow>=11.3",
+    "PySide6-Essentials>=6.7",
+    "pi-heif>=0.18",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-qt>=4.4", "pyinstaller>=6.10"]
+
+[project.scripts]
+webkep-cli = "webkep.cli:main"
+
+[project.gui-scripts]
+webkep = "webkep.gui.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "webkep.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["webkep*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+qt_api = "pyside6"
+addopts = "-ra"

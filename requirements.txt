@@ -1,0 +1,4 @@
+# Futtatáshoz szükséges csomagok
+Pillow>=11.3
+PySide6-Essentials>=6.7
+pi-heif>=0.18
