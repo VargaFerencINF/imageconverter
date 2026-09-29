@@ -350,7 +350,7 @@ STRINGS: dict[str, tuple[str, str]] = {
         "Mindkettő bejelölésével minden képből WebP és AVIF változat is készül (pl. <picture> elemhez).",
         "Check both to create a WebP and an AVIF version of every image (e.g. for <picture>).",
     ),
-    "fmt.keep_animation": ("Animációk megtartása (GIF → animált WebP/AVIF)", "Keep animations (GIF → animated WebP/AVIF)"),
+    "fmt.keep_animation": ("Animációk megtartása (GIF → animált kép)", "Keep animations (GIF → animated image)"),
     "fmt.keep_animation_tip": (
         "Kikapcsolva az animált képekből csak az első képkocka készül el.",
         "When off, only the first frame of animated images is converted.",
@@ -427,7 +427,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     "rs.mode.width": ("Megadott szélesség", "Fixed width"),
     "rs.mode.height": ("Megadott magasság", "Fixed height"),
     "rs.mode.long_edge": ("Hosszabbik oldal max. mérete", "Maximum long edge"),
-    "rs.mode.fit": ("Beillesztés dobozba (max. szélesség × magasság)", "Fit inside box (max width × height)"),
+    "rs.mode.fit": ("Beillesztés dobozba (max. szél. × mag.)", "Fit inside box (max W × H)"),
     "rs.mode.fill": ("Kitöltés és vágás pontos méretre", "Fill and crop to exact size"),
     "rs.percent": ("Méret", "Scale"),
     "rs.width": ("Szélesség", "Width"),
@@ -462,12 +462,12 @@ STRINGS: dict[str, tuple[str, str]] = {
     "rs.strong": ("erős", "strong"),
 
     "md.title": ("Metaadatok", "Metadata"),
-    "md.auto_orient": ("Automatikus elforgatás (EXIF tájolás alapján)", "Auto-rotate (based on EXIF orientation)"),
+    "md.auto_orient": ("Automatikus elforgatás (EXIF alapján)", "Auto-rotate (from EXIF)"),
     "md.auto_orient_tip": (
         "A telefonnal készült, „oldalra dőlt” fotókat a helyes állásba forgatja.",
         "Rotates phone photos that would otherwise appear sideways.",
     ),
-    "md.keep_exif": ("EXIF adatok megtartása (gép, dátum, expozíció…)", "Keep EXIF data (camera, date, exposure…)"),
+    "md.keep_exif": ("EXIF megtartása (gép, dátum, expozíció)", "Keep EXIF (camera, date, exposure)"),
     "md.keep_exif_tip": (
         "Webre általában felesleges – eltávolítva kisebb a fájl és nem kerül ki személyes adat.",
         "Usually unnecessary on the web – removing it saves bytes and protects privacy.",
@@ -477,7 +477,7 @@ STRINGS: dict[str, tuple[str, str]] = {
         "Adatvédelem: a fotó készítésének helye nem kerül bele a kimeneti fájlba.",
         "Privacy: the location where the photo was taken is not included in the output.",
     ),
-    "md.keep_xmp": ("XMP adatok megtartása (címkék, szerzői jog)", "Keep XMP data (keywords, copyright)"),
+    "md.keep_xmp": ("XMP megtartása (címkék, szerzői jog)", "Keep XMP (keywords, copyright)"),
     "md.keep_xmp_tip": (
         "Az Adobe/Lightroom által írt kiegészítő metaadatok (pl. szerző, kulcsszavak).",
         "Additional metadata written by Adobe/Lightroom (e.g. author, keywords).",
@@ -493,7 +493,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     ),
     "md.color_title": ("Színkezelés", "Colour management"),
     "md.color": ("Színprofil", "Colour profile"),
-    "md.color.srgb": ("Átalakítás sRGB-re (ajánlott webre)", "Convert to sRGB (recommended for the web)"),
+    "md.color.srgb": ("Átalakítás sRGB-re (ajánlott webre)", "Convert to sRGB (best for web)"),
     "md.color.keep": ("Eredeti profil beágyazása", "Embed original profile"),
     "md.color.strip": ("Profil eltávolítása átalakítás nélkül", "Remove profile without conversion"),
     "md.color_hint": (
@@ -506,7 +506,7 @@ STRINGS: dict[str, tuple[str, str]] = {
     "nm.suffix": ("Utótag", "Suffix"),
     "nm.prefix_ph": ("pl. web-", "e.g. web-"),
     "nm.suffix_ph": ("pl. -min", "e.g. -min"),
-    "nm.web_safe": ("Webbarát fájlnevek (ékezetek és szóközök nélkül, kisbetűs)", "Web-safe names (no accents or spaces, lowercase)"),
+    "nm.web_safe": ("Webbarát nevek (ékezet és szóköz nélkül)", "Web-safe names (no accents or spaces)"),
     "nm.web_safe_tip": ("„Nyári Fotó 01.JPG” → „nyari-foto-01.webp”", "“Summer Photo 01.JPG” → “summer-photo-01.webp”"),
     "nm.lowercase": ("Kisbetűs fájlnevek", "Lowercase file names"),
     "nm.conflict": ("Ha a fájl már létezik", "If the file exists"),
@@ -535,7 +535,7 @@ STRINGS: dict[str, tuple[str, str]] = {
         "Ennél rosszabb minőségre nem megy le a keresés; ha így sem fér bele, a legkisebb változat készül el.",
         "The search never goes below this; if the size still can't be met, the smallest version is kept.",
     ),
-    "sz.skip_larger": ("Ne mentse, ha nagyobb lenne, mint az eredeti", "Skip if the result is larger than the original"),
+    "sz.skip_larger": ("Ne mentse, ha nagyobb, mint az eredeti", "Skip if larger than the original"),
     "sz.skip_larger_tip": (
         "Ritkán, de előfordul (pl. már erősen tömörített képeknél), hogy a konvertált fájl nagyobb.",
         "Occasionally (e.g. already heavily compressed images) the converted file is larger.",

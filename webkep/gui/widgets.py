@@ -105,6 +105,9 @@ class SliderSpin(QWidget):
             left = hint(left_caption, wrap=False)
             right = hint(right_caption, wrap=False)
             right.setAlignment(Qt.AlignmentFlag.AlignRight)
+            for cap in (left, right):  # a feliratok ne szabják meg a minimális szélességet
+                cap.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+            self.slider.setMinimumWidth(176)
             grid.addWidget(left, 1, 0)
             grid.addWidget(right, 1, 1)
         self.slider.valueChanged.connect(self._from_slider)
@@ -235,5 +238,5 @@ def form_grid() -> QGridLayout:
     grid.setHorizontalSpacing(12)
     grid.setVerticalSpacing(10)
     grid.setColumnStretch(1, 1)
-    grid.setColumnMinimumWidth(0, 150)
+    grid.setColumnMinimumWidth(0, 110)
     return grid

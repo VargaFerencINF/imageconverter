@@ -142,7 +142,6 @@ class MainWindow(QMainWindow):
         left_lay.addWidget(self.v_split, 1)
 
         self.settings_panel = SettingsPanel()
-        self.settings_panel.setMinimumWidth(400)
         self.settings_panel.changed.connect(self._on_settings_changed)
         self.settings_panel.app_options_changed.connect(self._schedule_save)
         self.settings_panel.groups_changed.connect(lambda: self._rescan_timer.start())

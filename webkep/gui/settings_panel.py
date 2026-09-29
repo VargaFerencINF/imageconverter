@@ -65,8 +65,12 @@ def _combo(items: list[tuple[str, object]]) -> QComboBox:
     # A Qt a str-alapú Enum értékeket sima str-ként adja vissza, ezért
     # az értéket tároljuk, és olvasáskor alakítjuk vissza (_enum_data).
     cb = QComboBox()
+    # hosszú elemeknél se nőjön túl szélesre (a lenyíló lista teljes szélességű marad)
+    cb.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+    cb.setMinimumContentsLength(14)
     for text, data in items:
         cb.addItem(text, data.value if isinstance(data, Enum) else data)
+    cb.view().setMinimumWidth(cb.view().sizeHintForColumn(0) + 24)
     return cb
 
 
@@ -87,7 +91,7 @@ def _scroll(widget: QWidget) -> QScrollArea:
     area = QScrollArea()
     area.setWidgetResizable(True)
     area.setFrameShape(QScrollArea.Shape.NoFrame)
-    area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
     area.setWidget(widget)
     return area
 
@@ -122,6 +126,9 @@ class SettingsPanel(QWidget):
         self.set_settings(ConversionSettings())
         self._connect_all()
         self.refresh_icons()
+        # A panel legalább olyan széles legyen, hogy egyik fül tartalma se vágódjon le.
+        widest = max(self.tabs.widget(i).widget().minimumSizeHint().width() for i in range(self.tabs.count()))
+        self.setMinimumWidth(widest + 28)
 
     def _card(self, title: str, icon_name: str | None = None) -> Card:
         card = Card(title, icon_name=icon_name)
