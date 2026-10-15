@@ -54,7 +54,7 @@ class AboutDialog(QDialog):
         desc.setWordWrap(True)
         lay.addWidget(desc)
 
-        card = Card(tr("about.libraries"))
+        card = Card(tr("about.libraries"), inset=True)
         grid = QGridLayout()
         grid.setHorizontalSpacing(16)
         for i, (k, v) in enumerate(library_versions().items()):
@@ -68,7 +68,7 @@ class AboutDialog(QDialog):
         card.body().addLayout(grid)
         lay.addWidget(card)
 
-        shortcuts = Card(tr("about.shortcuts"))
+        shortcuts = Card(tr("about.shortcuts"), inset=True)
         sc = QLabel(tr("about.shortcuts_text"))
         sc.setTextFormat(Qt.TextFormat.RichText)
         shortcuts.body().addWidget(sc)
@@ -121,7 +121,7 @@ class SummaryDialog(QDialog):
         sub.setObjectName("Muted")
         lay.addWidget(sub)
 
-        card = Card()
+        card = Card(inset=True)
         grid = QGridLayout()
         _stat(grid, 0, str(summary.done), tr("sum.done"), "BigStat")
         _stat(grid, 1, str(summary.skipped), tr("sum.skipped"))
@@ -131,7 +131,7 @@ class SummaryDialog(QDialog):
         lay.addWidget(card)
 
         if summary.per_format:
-            card = Card(tr("sum.sizes"))
+            card = Card(tr("sum.sizes"), inset=True)
             g = QGridLayout()
             g.setHorizontalSpacing(18)
             for i, fmt in enumerate(OutputFormat):
@@ -204,7 +204,7 @@ class EstimateDialog(QDialog):
         )
         intro.setWordWrap(True)
         lay.addWidget(intro)
-        card = Card()
+        card = Card(inset=True)
         g = QGridLayout()
         g.setHorizontalSpacing(18)
         formats = result.formats

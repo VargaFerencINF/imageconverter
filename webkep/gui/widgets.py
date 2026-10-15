@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QDir, Qt, Signal
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtCore import QDir, QRectF, Qt, Signal
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPainter
 from PySide6.QtWidgets import (
     QCompleter,
     QFileDialog,
@@ -30,13 +30,28 @@ from . import theme
 
 
 class Card(QFrame):
-    """Lekerekített, keretes panel opcionális címmel."""
+    """Lebegő, áttetsző „üveg” panel (macOS-stílus) opcionális címmel.
 
-    def __init__(self, title: str = "", parent: QWidget | None = None, icon_name: str | None = None):
+    ``inset=True``: egy másik panelen belüli, árnyék nélküli csoport
+    (mint a macOS Rendszerbeállítások csoportjai)."""
+
+    SHADOW_PAD = 8
+
+    def __init__(
+        self,
+        title: str = "",
+        parent: QWidget | None = None,
+        icon_name: str | None = None,
+        inset: bool = False,
+        radius: float | None = None,
+    ):
         super().__init__(parent)
         self.setObjectName("Card")
+        self.inset = inset
+        self.radius = radius if radius is not None else (11.0 if inset else 16.0)
+        self._pad = 0 if inset else self.SHADOW_PAD
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(14, 12, 14, 14)
+        self.set_inner_margins(14, 12, 14, 14)
         self._layout.setSpacing(10)
         self.header = QHBoxLayout()
         self.header.setSpacing(8)
@@ -54,12 +69,33 @@ class Card(QFrame):
             self.header.addStretch(1)
             self._layout.addLayout(self.header)
 
+    def set_inner_margins(self, left: int, top: int, right: int, bottom: int) -> None:
+        """Belső margó az üvegfelületen belül (az árnyék helyét automatikusan hozzáadja)."""
+        pad = self._pad
+        self._layout.setContentsMargins(left + pad, top + pad, right + pad, bottom + pad)
+
     def body(self) -> QVBoxLayout:
         return self._layout
 
     def refresh_icon(self) -> None:
         if self.icon_label and self.icon_name:
             self.icon_label.setPixmap(theme.icon(self.icon_name, "accent").pixmap(18, 18))
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        pad = self._pad
+        rect = QRectF(self.rect()).adjusted(pad, pad - 2, -pad, -pad - 2) if pad else QRectF(self.rect())
+        theme.paint_glass(painter, rect, self.radius, shadow=not self.inset, inset=self.inset)
+        painter.end()
+
+
+class Backdrop(QWidget):
+    """Az ablak színes, elmosott háttere, amely felett az üvegpanelek lebegnek."""
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        painter.drawPixmap(0, 0, theme.backdrop_pixmap(self.width(), self.height()))
+        painter.end()
 
 
 def hint(text: str, wrap: bool = True) -> QLabel:

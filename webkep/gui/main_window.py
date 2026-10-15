@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QDir, QElapsedTimer, QProcess, QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QDragEnterEvent, QDropEvent, QKeySequence, QShortcut
+from PySide6.QtGui import QPainter, QAction, QCloseEvent, QDesktopServices, QDragEnterEvent, QDropEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -118,22 +118,25 @@ class MainWindow(QMainWindow):
         root.setObjectName("Root")
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
-        outer.setContentsMargins(14, 10, 14, 10)
-        outer.setSpacing(10)
-        outer.addLayout(self._build_header())
+        outer.setContentsMargins(8, 6, 8, 2)
+        outer.setSpacing(0)
+        toolbar = Card(radius=18)
+        toolbar.set_inner_margins(14, 8, 10, 8)
+        toolbar.body().addLayout(self._build_header())
+        outer.addWidget(toolbar)
 
         self.h_split = QSplitter(Qt.Orientation.Horizontal)
         self.h_split.setChildrenCollapsible(False)
-        self.h_split.setHandleWidth(10)
+        self.h_split.setHandleWidth(2)
 
         left = QWidget()
         left_lay = QVBoxLayout(left)
         left_lay.setContentsMargins(0, 0, 0, 0)
-        left_lay.setSpacing(10)
+        left_lay.setSpacing(0)
         left_lay.addWidget(self._build_folders_card())
         self.v_split = QSplitter(Qt.Orientation.Vertical)
         self.v_split.setChildrenCollapsible(True)
-        self.v_split.setHandleWidth(10)
+        self.v_split.setHandleWidth(2)
         self.v_split.addWidget(self._build_files_card())
         self.v_split.addWidget(self._build_log_card())
         self.v_split.setStretchFactor(0, 4)
@@ -146,8 +149,12 @@ class MainWindow(QMainWindow):
         self.settings_panel.app_options_changed.connect(self._schedule_save)
         self.settings_panel.groups_changed.connect(lambda: self._rescan_timer.start())
 
+        settings_card = Card()
+        settings_card.set_inner_margins(8, 10, 8, 8)
+        settings_card.body().addWidget(self.settings_panel)
+
         self.h_split.addWidget(left)
-        self.h_split.addWidget(self.settings_panel)
+        self.h_split.addWidget(settings_card)
         self.h_split.setStretchFactor(0, 3)
         self.h_split.setStretchFactor(1, 2)
         self.h_split.setSizes([860, 460])
@@ -333,7 +340,7 @@ class MainWindow(QMainWindow):
         self.table_stack.addWidget(self.drop_hint)
         self.table_stack.addWidget(self.table)
         card.body().addWidget(holder, 1)
-        card.body().setContentsMargins(10, 12, 10, 10)
+        card.set_inner_margins(10, 12, 10, 10)
         return card
 
     def _build_log_card(self) -> Card:
@@ -348,7 +355,7 @@ class MainWindow(QMainWindow):
         self.log_view.setMaximumBlockCount(20000)
         self.log_clear_btn.clicked.connect(self.log_view.clear)
         card.body().addWidget(self.log_view)
-        card.body().setContentsMargins(10, 10, 10, 10)
+        card.set_inner_margins(10, 10, 10, 10)
         return card
 
     def _build_run_card(self) -> Card:
@@ -394,7 +401,7 @@ class MainWindow(QMainWindow):
             lay.addWidget(b)
         lay.addWidget(self.start_btn)
         card.body().addLayout(lay)
-        card.body().setContentsMargins(14, 10, 14, 10)
+        card.set_inner_margins(14, 10, 14, 10)
         return card
 
     def _build_shortcuts(self) -> None:
@@ -1021,8 +1028,8 @@ class MainWindow(QMainWindow):
         self.lbl_eta.setText(tr("run.total_time", time=fmt_duration(summary.elapsed)))
 
     def _set_progress_text(self, parts: list[str]) -> None:
-        text = "%p%" + ("   ·   " + "   ·   ".join(parts) if parts else "")
-        self.progress.setFormat(text.replace("%", "%%").replace("%%p%%", "%p%"))
+        # A QProgressBar csak a %p / %v / %m jelölőket cseréli; a többi % szó szerint marad.
+        self.progress.setFormat("%p%" + ("   ·   " + "   ·   ".join(parts) if parts else ""))
 
     def _reset_progress(self) -> None:
         self.progress.setRange(0, 100)
@@ -1168,6 +1175,12 @@ class MainWindow(QMainWindow):
             self.input_picker.setPath(QDir.toNativeSeparators(str(paths[0])))
         else:
             self._add_paths(paths)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        # A színes háttér az egész ablak mögé kerül (az állapotsor alá is).
+        painter = QPainter(self)
+        painter.drawPixmap(0, 0, theme.backdrop_pixmap(self.width(), self.height()))
+        painter.end()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         if self._running:

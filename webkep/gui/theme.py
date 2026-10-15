@@ -1,4 +1,4 @@
-"""Sötét / világos téma: paletta, stíluslap és színezhető vektoros ikonok."""
+"""macOS-ihletésű sötét / világos téma: üvegpanelek, paletta, stíluslap, ikonok."""
 
 from __future__ import annotations
 
@@ -6,18 +6,30 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QDir, QRectF, QSize, Qt, QTemporaryDir
-from PySide6.QtGui import QColor, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtCore import QByteArray, QDir, QEvent, QObject, QPointF, QRectF, QSize, Qt, QTemporaryDir
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QFontDatabase,
+    QIcon,
+    QLinearGradient,
+    QPainter,
+    QPalette,
+    QPen,
+    QPixmap,
+    QRadialGradient,
+)
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 
 @dataclass(frozen=True)
 class Palette:
     name: str
-    bg: str
-    surface: str
-    surface2: str
+    bg: str  # ablak alapszín (a színes háttér "alja")
+    surface: str  # tömör felület (párbeszédablakok)
+    surface2: str  # beviteli mezők alapja (tömör)
     border: str
     text: str
     muted: str
@@ -28,44 +40,71 @@ class Palette:
     warning: str
     danger: str
     selection: str
+    # macOS-szerű "üveg" rétegek (r, g, b, alfa 0-255)
+    glass: tuple[int, int, int, int] = (40, 40, 46, 178)
+    glass_inset: tuple[int, int, int, int] = (255, 255, 255, 12)
+    glass_border: tuple[int, int, int, int] = (255, 255, 255, 26)
+    glass_highlight: tuple[int, int, int, int] = (255, 255, 255, 22)
+    control: tuple[int, int, int, int] = (255, 255, 255, 20)
+    control_hover: tuple[int, int, int, int] = (255, 255, 255, 34)
+    popup: tuple[int, int, int, int] = (40, 40, 46, 250)
+    shadow_alpha: int = 70
+    blobs: tuple[str, ...] = ("#3a5bd9", "#8a3ffc", "#0fa3b1", "#d9467a")
 
 
 DARK = Palette(
     name="dark",
-    bg="#121419",
-    surface="#1a1d24",
-    surface2="#232733",
-    border="#2e3440",
-    text="#e7e9ee",
-    muted="#949cab",
-    accent="#5b8cff",
-    accent_hover="#7aa2ff",
-    accent_pressed="#4674e6",
-    success="#3dd68c",
-    warning="#f5b94a",
-    danger="#ff6b6b",
-    selection="#2b3b63",
+    bg="#16161a",
+    surface="#232328",
+    surface2="#2c2c32",
+    border="#3a3a42",
+    text="#f5f5f7",
+    muted="#98989f",
+    accent="#0a84ff",
+    accent_hover="#409cff",
+    accent_pressed="#0071e3",
+    success="#30d158",
+    warning="#ff9f0a",
+    danger="#ff453a",
+    selection="#1f4f8f",
 )
 
 LIGHT = Palette(
     name="light",
-    bg="#f2f4f8",
+    bg="#eceef3",
     surface="#ffffff",
-    surface2="#f6f7fa",
-    border="#d8dde6",
-    text="#1a1f2b",
-    muted="#5f6878",
-    accent="#3f6fe8",
-    accent_hover="#5883f0",
-    accent_pressed="#325dd0",
-    success="#1c9a5f",
-    warning="#b97d06",
-    danger="#d9463b",
-    selection="#d6e2ff",
+    surface2="#ffffff",
+    border="#d2d2d7",
+    text="#1d1d1f",
+    muted="#6e6e73",
+    accent="#007aff",
+    accent_hover="#2b8fff",
+    accent_pressed="#0062cc",
+    success="#28a745",
+    warning="#c77700",
+    danger="#e0352b",
+    selection="#cfe2ff",
+    glass=(255, 255, 255, 168),
+    glass_inset=(255, 255, 255, 150),
+    glass_border=(0, 0, 0, 22),
+    glass_highlight=(255, 255, 255, 200),
+    control=(255, 255, 255, 215),
+    control_hover=(255, 255, 255, 255),
+    popup=(250, 250, 252, 250),
+    shadow_alpha=34,
+    blobs=("#7fa7ff", "#c59bff", "#7fe3d6", "#ffb3c7"),
 )
 
 _current: Palette = DARK
 _asset_dir: QTemporaryDir | None = None
+
+
+def rgba(c: tuple[int, int, int, int]) -> str:
+    return f"rgba({c[0]}, {c[1]}, {c[2]}, {c[3]})"
+
+
+def qcolor(c: tuple[int, int, int, int]) -> QColor:
+    return QColor(c[0], c[1], c[2], c[3])
 
 
 def current() -> Palette:
@@ -191,12 +230,41 @@ def logo_pixmap(size: int) -> QPixmap:
 
 
 # --------------------------------------------------------------------------
-# Stíluslap
+# Generált képek a stíluslaphoz (nyilak, pipa, macOS-szerű kapcsolók)
 # --------------------------------------------------------------------------
 
 
+def _switch_pixmap(p: Palette, on: bool, enabled: bool, scale: int) -> QPixmap:
+    w, h = 34 * scale, 20 * scale
+    pm = QPixmap(w, h)
+    pm.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pm)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(Qt.PenStyle.NoPen)
+    if on:
+        track = QColor(p.accent)
+    else:
+        track = QColor(255, 255, 255, 46) if p.name == "dark" else QColor(0, 0, 0, 34)
+    if not enabled:
+        track.setAlpha(int(track.alpha() * 0.45))
+    painter.setBrush(track)
+    painter.drawRoundedRect(QRectF(0, 0, w, h), h / 2, h / 2)
+    m = 2 * scale
+    d = h - 2 * m
+    x = w - m - d if on else m
+    painter.setBrush(QColor(0, 0, 0, 40))  # a gomb enyhe árnyéka
+    painter.drawEllipse(QRectF(x, m + 0.6 * scale, d, d))
+    knob = QColor("#ffffff")
+    if not enabled:
+        knob.setAlpha(150)
+    painter.setBrush(knob)
+    painter.drawEllipse(QRectF(x, m, d, d))
+    painter.end()
+    return pm
+
+
 def _write_assets(p: Palette) -> Path:
-    """A stíluslapban hivatkozott nyíl/pipa képek generálása ideiglenes mappába."""
+    """A stíluslapban hivatkozott képek generálása ideiglenes mappába."""
     global _asset_dir
     if _asset_dir is None:
         # ASCII sablon: az alkalmazásnév (ékezet, szóköz) ne kerüljön az útvonalba
@@ -210,7 +278,17 @@ def _write_assets(p: Palette) -> Path:
         svg = _svg(name, color, 2.6)
         render_svg(svg, 12, 1.0).save(str(base / f"{tag}_{p.name}.png"))
         render_svg(svg, 24, 1.0).save(str(base / f"{tag}_{p.name}@2x.png"))
+    for on in (False, True):
+        for enabled in (True, False):
+            tag = f"switch_{'on' if on else 'off'}{'' if enabled else '_dis'}_{p.name}"
+            _switch_pixmap(p, on, enabled, 1).save(str(base / f"{tag}.png"))
+            _switch_pixmap(p, on, enabled, 2).save(str(base / f"{tag}@2x.png"))
     return base
+
+
+# --------------------------------------------------------------------------
+# Stíluslap
+# --------------------------------------------------------------------------
 
 
 def stylesheet(p: Palette) -> str:
@@ -221,50 +299,72 @@ def stylesheet(p: Palette) -> str:
         return 'url("' + f"{assets}/{name}_{p.name}.png".replace('"', '\\"') + '")'
 
     down, up, check = url("down"), url("up"), url("check")
+    sw_off, sw_on = url("switch_off"), url("switch_on")
+    sw_off_dis, sw_on_dis = url("switch_off_dis"), url("switch_on_dis")
+    dark = p.name == "dark"
+    ctrl, ctrl_hover = rgba(p.control), rgba(p.control_hover)
+    hairline = rgba(p.glass_border)
+    inset = rgba(p.glass_inset)
+    popup = rgba(p.popup)
+    focus_ring = "rgba(10, 132, 255, 150)" if dark else "rgba(0, 122, 255, 140)"
+    sel = "rgba(10, 132, 255, 70)" if dark else "rgba(0, 122, 255, 46)"
+    alt_row = "rgba(255, 255, 255, 7)" if dark else "rgba(0, 0, 0, 9)"
+    segment = "rgba(255, 255, 255, 18)" if dark else "rgba(0, 0, 0, 16)"
+    segment_on = "rgba(255, 255, 255, 46)" if dark else "rgba(255, 255, 255, 255)"
+    scroll = "rgba(255, 255, 255, 50)" if dark else "rgba(0, 0, 0, 60)"
+    scroll_hover = "rgba(255, 255, 255, 90)" if dark else "rgba(0, 0, 0, 100)"
+    groove = "rgba(255, 255, 255, 40)" if dark else "rgba(0, 0, 0, 30)"
     return f"""
 * {{ outline: none; }}
 QWidget {{ color: {p.text}; font-size: 10pt; }}
-QMainWindow, QDialog, QWidget#Root {{ background: {p.bg}; }}
-QToolTip {{ background: {p.surface2}; color: {p.text}; border: 1px solid {p.border};
-    border-radius: 6px; padding: 6px 8px; }}
+QMainWindow, QDialog {{ background: {p.bg}; }}
+QWidget#Root {{ background: transparent; }}
+QToolTip {{ background: {popup}; color: {p.text}; border: 1px solid {hairline};
+    border-radius: 8px; padding: 6px 9px; }}
 
-QFrame#Card {{ background: {p.surface}; border: 1px solid {p.border}; border-radius: 12px; }}
+QFrame#Card {{ background: transparent; border: none; }}
 QFrame#Card QLabel, QFrame#Card QCheckBox, QFrame#Card QRadioButton {{ background: transparent; }}
 QLabel#CardTitle {{ font-size: 10.5pt; font-weight: 600; }}
 QLabel#Muted, QLabel#Hint {{ color: {p.muted}; }}
 QLabel#Hint {{ font-size: 9pt; }}
-QLabel#AppTitle {{ font-size: 15pt; font-weight: 700; }}
+QLabel#AppTitle {{ font-size: 14pt; font-weight: 700; }}
 QLabel#Version {{ color: {p.muted}; font-size: 9pt; }}
-QLabel#BigStat {{ font-size: 16pt; font-weight: 700; }}
-QLabel#Badge {{ background: {p.surface2}; border: 1px solid {p.border}; border-radius: 9px;
-    padding: 1px 8px; color: {p.muted}; font-size: 9pt; }}
+QLabel#BigStat {{ font-size: 18pt; font-weight: 700; }}
+QLabel#Badge {{ background: {segment}; border: none; border-radius: 9px;
+    padding: 2px 9px; color: {p.muted}; font-size: 9pt; }}
 QLabel#Success {{ color: {p.success}; font-weight: 600; }}
 QLabel#Warning {{ color: {p.warning}; font-weight: 600; }}
 QLabel#Danger {{ color: {p.danger}; font-weight: 600; }}
-QLabel#DropHint {{ color: {p.muted}; font-size: 11pt; }}
+QLabel#DropHint {{ color: {p.muted}; font-size: 12pt; font-weight: 600; }}
 
-QPushButton, QToolButton {{ background: {p.surface2}; border: 1px solid {p.border};
-    border-radius: 8px; padding: 6px 12px; }}
-QToolButton {{ padding: 5px; }}
-QPushButton:hover, QToolButton:hover {{ border-color: {p.accent}; }}
-QPushButton:pressed, QToolButton:pressed {{ background: {p.border}; }}
-QPushButton:disabled, QToolButton:disabled {{ color: {p.muted}; border-color: {p.border}; }}
-QPushButton:checked, QToolButton:checked {{ background: {p.selection}; border-color: {p.accent}; }}
-QPushButton#Primary {{ background: {p.accent}; color: #ffffff; border: 1px solid {p.accent};
-    font-weight: 600; padding: 8px 20px; }}
-QPushButton#Primary:hover {{ background: {p.accent_hover}; border-color: {p.accent_hover}; }}
+QPushButton {{ background: {ctrl}; border: 1px solid {hairline}; border-radius: 8px;
+    padding: 6px 14px; }}
+QPushButton:hover {{ background: {ctrl_hover}; }}
+QPushButton:pressed {{ background: {segment}; }}
+QPushButton:disabled {{ color: {p.muted}; background: {segment}; }}
+QPushButton:checked {{ background: {sel}; border-color: {p.accent}; }}
+QToolButton {{ background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 5px; }}
+QToolButton:hover {{ background: {ctrl}; border-color: {hairline}; }}
+QToolButton:pressed {{ background: {segment}; }}
+QToolButton:disabled {{ color: {p.muted}; }}
+QToolButton:checked {{ background: {sel}; }}
+QPushButton#Primary {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {p.accent_hover}, stop:1 {p.accent});
+    color: #ffffff; border: 1px solid {p.accent_pressed}; font-weight: 600; padding: 8px 22px; }}
+QPushButton#Primary:hover {{ background: {p.accent_hover}; }}
 QPushButton#Primary:pressed {{ background: {p.accent_pressed}; }}
-QPushButton#Primary:disabled {{ background: {p.border}; border-color: {p.border}; color: {p.muted}; }}
-QPushButton#Danger:hover {{ border-color: {p.danger}; color: {p.danger}; }}
+QPushButton#Primary:disabled {{ background: {segment}; border-color: transparent; color: {p.muted}; }}
+QPushButton#Danger:hover {{ color: {p.danger}; border-color: {p.danger}; }}
 QToolButton::menu-indicator {{ image: none; width: 0; }}
 QPushButton::menu-indicator {{ image: {down}; subcontrol-position: right center; right: 6px; }}
 
-QLineEdit, QSpinBox, QComboBox, QPlainTextEdit, QTextBrowser {{ background: {p.surface2};
-    border: 1px solid {p.border}; border-radius: 7px; padding: 5px 8px;
+QLineEdit, QSpinBox, QComboBox, QPlainTextEdit, QTextBrowser {{ background: {ctrl};
+    border: 1px solid {hairline}; border-radius: 8px; padding: 5px 9px;
     selection-background-color: {p.accent}; selection-color: #ffffff; }}
-QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QPlainTextEdit:focus {{ border-color: {p.accent}; }}
-QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {{ color: {p.muted}; }}
-QPlainTextEdit#Log {{ font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace; font-size: 9pt; }}
+QLineEdit:hover, QSpinBox:hover, QComboBox:hover {{ background: {ctrl_hover}; }}
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus, QPlainTextEdit:focus {{ border: 1px solid {focus_ring}; }}
+QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {{ color: {p.muted}; background: {segment}; }}
+QPlainTextEdit#Log {{ background: {inset}; font-family: "SF Mono", "Cascadia Mono", "Consolas",
+    "DejaVu Sans Mono", monospace; font-size: 9pt; }}
 QSpinBox {{ padding-right: 22px; min-height: 20px; }}
 QSpinBox::up-button, QSpinBox::down-button {{ subcontrol-origin: border; width: 20px; border: none;
     background: transparent; }}
@@ -275,67 +375,74 @@ QSpinBox::down-arrow {{ image: {down}; width: 10px; height: 10px; }}
 QComboBox {{ padding-right: 26px; min-height: 20px; }}
 QComboBox::drop-down {{ border: none; width: 24px; }}
 QComboBox::down-arrow {{ image: {down}; width: 12px; height: 12px; }}
-QComboBox QAbstractItemView {{ background: {p.surface}; border: 1px solid {p.border};
-    selection-background-color: {p.selection}; selection-color: {p.text}; padding: 4px; outline: none; }}
+QComboBox QAbstractItemView {{ background: {p.surface}; border: 1px solid {hairline};
+    border-radius: 8px; selection-background-color: {p.accent}; selection-color: #ffffff;
+    padding: 4px; outline: none; }}
 
-QCheckBox, QRadioButton {{ spacing: 8px; }}
-QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 5px; border: 1px solid {p.border};
-    background: {p.surface2}; }}
-QCheckBox::indicator:hover {{ border-color: {p.accent}; }}
-QCheckBox::indicator:checked {{ background: {p.accent}; border-color: {p.accent}; image: {check}; }}
-QCheckBox::indicator:disabled {{ background: {p.border}; }}
+QCheckBox, QRadioButton {{ spacing: 9px; background: transparent; }}
+QCheckBox::indicator {{ width: 34px; height: 20px; border: none; image: {sw_off}; }}
+QCheckBox::indicator:checked {{ image: {sw_on}; }}
+QCheckBox::indicator:disabled {{ image: {sw_off_dis}; }}
+QCheckBox::indicator:checked:disabled {{ image: {sw_on_dis}; }}
 QCheckBox:disabled, QRadioButton:disabled {{ color: {p.muted}; }}
 
-QSlider::groove:horizontal {{ height: 6px; background: {p.border}; border-radius: 3px; }}
-QSlider::sub-page:horizontal {{ background: {p.accent}; border-radius: 3px; }}
+QSlider {{ background: transparent; }}
+QSlider::groove:horizontal {{ height: 4px; background: {groove}; border-radius: 2px; }}
+QSlider::sub-page:horizontal {{ background: {p.accent}; border-radius: 2px; }}
 QSlider::sub-page:horizontal:disabled {{ background: {p.muted}; }}
-QSlider::handle:horizontal {{ background: #ffffff; border: 2px solid {p.accent}; width: 14px; height: 14px;
-    margin: -6px 0; border-radius: 9px; }}
-QSlider::handle:horizontal:hover {{ border-color: {p.accent_hover}; }}
-QSlider::handle:horizontal:disabled {{ border-color: {p.muted}; }}
+QSlider::handle:horizontal {{ background: #ffffff; border: 1px solid rgba(0, 0, 0, 40);
+    width: 18px; height: 18px; margin: -8px 0; border-radius: 10px; }}
+QSlider::handle:horizontal:hover {{ background: #f2f2f7; }}
+QSlider::handle:horizontal:disabled {{ background: {p.muted}; }}
 
-QTabWidget::pane {{ border: 1px solid {p.border}; border-radius: 10px; background: {p.surface}; top: -1px; }}
-QTabBar::tab {{ background: transparent; color: {p.muted}; padding: 7px 12px; margin-right: 2px;
-    border: 1px solid transparent; border-top-left-radius: 8px; border-top-right-radius: 8px; }}
-QTabBar::tab:selected {{ background: {p.surface}; color: {p.text}; border-color: {p.border};
-    border-bottom-color: {p.surface}; }}
-QTabBar::tab:hover:!selected {{ color: {p.text}; }}
+QTabWidget::pane {{ border: none; background: transparent; top: 6px; }}
+QTabWidget::tab-bar {{ alignment: center; }}
+QTabBar {{ background: transparent; }}
+QTabBar::tab {{ background: {segment}; color: {p.text}; padding: 6px 14px; margin: 0;
+    border: none; min-width: 52px; }}
+QTabBar::tab:first {{ border-top-left-radius: 9px; border-bottom-left-radius: 9px; }}
+QTabBar::tab:last {{ border-top-right-radius: 9px; border-bottom-right-radius: 9px; }}
+QTabBar::tab:selected {{ background: {segment_on}; font-weight: 600; border-radius: 8px; }}
+QTabBar::tab:hover:!selected {{ background: {ctrl_hover}; }}
 
-QTableView {{ background: {p.surface}; alternate-background-color: {p.surface2}; border: none;
-    gridline-color: transparent; selection-background-color: {p.selection}; selection-color: {p.text}; }}
+QTableView {{ background: transparent; alternate-background-color: {alt_row}; border: none;
+    gridline-color: transparent; selection-background-color: {sel}; selection-color: {p.text}; }}
 QTableView::item {{ padding: 0 6px; border: none; }}
-QTableView::indicator {{ width: 15px; height: 15px; border-radius: 4px; border: 1px solid {p.border};
-    background: {p.surface2}; }}
+QTableView::indicator {{ width: 16px; height: 16px; border-radius: 5px; border: 1px solid {hairline};
+    background: {ctrl}; }}
 QTableView::indicator:checked {{ background: {p.accent}; border-color: {p.accent}; image: {check}; }}
-QHeaderView {{ background: {p.surface}; border: none; }}
-QHeaderView::section {{ background: {p.surface}; color: {p.muted}; border: none;
-    border-bottom: 1px solid {p.border}; padding: 6px 8px; font-weight: 600; }}
+QHeaderView {{ background: transparent; border: none; }}
+QHeaderView::section {{ background: transparent; color: {p.muted}; border: none;
+    border-bottom: 1px solid {hairline}; padding: 6px 8px; font-weight: 600; font-size: 9pt; }}
 QHeaderView::section:hover {{ color: {p.text}; }}
-QTableCornerButton::section {{ background: {p.surface}; border: none; }}
+QTableCornerButton::section {{ background: transparent; border: none; }}
 
-QProgressBar {{ background: {p.surface2}; border: 1px solid {p.border}; border-radius: 8px;
+QProgressBar {{ background: {segment}; border: none; border-radius: 10px;
     text-align: center; min-height: 20px; color: {p.text}; font-weight: 600; }}
-QProgressBar::chunk {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {p.accent}, stop:1 #9b5cff);
-    border-radius: 7px; }}
+QProgressBar::chunk {{ background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {p.accent}, stop:1 #af52de);
+    border-radius: 10px; }}
 
-QScrollBar:vertical {{ background: transparent; width: 11px; margin: 2px; }}
-QScrollBar:horizontal {{ background: transparent; height: 11px; margin: 2px; }}
-QScrollBar::handle {{ background: {p.border}; border-radius: 4px; min-height: 30px; min-width: 30px; }}
-QScrollBar::handle:hover {{ background: {p.muted}; }}
+QScrollBar:vertical {{ background: transparent; width: 10px; margin: 3px 2px; }}
+QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px 3px; }}
+QScrollBar::handle {{ background: {scroll}; border-radius: 3px; min-height: 30px; min-width: 30px; }}
+QScrollBar::handle:hover {{ background: {scroll_hover}; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
 QScrollArea {{ background: transparent; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
+QStackedWidget, QStackedWidget > QWidget {{ background: transparent; }}
 
-QSplitter::handle {{ background: transparent; }}
-QSplitter::handle:hover {{ background: {p.border}; }}
-QMenu {{ background: {p.surface}; border: 1px solid {p.border}; border-radius: 8px; padding: 4px; }}
-QMenu::item {{ padding: 6px 22px 6px 10px; border-radius: 6px; }}
-QMenu::item:selected {{ background: {p.selection}; }}
-QMenu::separator {{ height: 1px; background: {p.border}; margin: 4px 6px; }}
-QStatusBar {{ background: {p.bg}; color: {p.muted}; }}
+QSplitter, QSplitter::handle {{ background: transparent; }}
+QMenu {{ background: {popup}; border: 1px solid {hairline}; border-radius: 11px; padding: 5px; }}
+QMenu::item {{ padding: 6px 22px 6px 12px; border-radius: 6px; background: transparent; }}
+QMenu::item:selected {{ background: {p.accent}; color: #ffffff; }}
+QMenu::item:disabled {{ color: {p.muted}; }}
+QMenu::separator {{ height: 1px; background: {hairline}; margin: 5px 8px; }}
+QMenu::icon {{ padding-left: 6px; }}
+QStatusBar {{ background: transparent; color: {p.muted}; }}
 QStatusBar::item {{ border: none; }}
-QGraphicsView {{ border: 1px solid {p.border}; border-radius: 8px; background: {p.surface2}; }}
+QGraphicsView {{ border: 1px solid {hairline}; border-radius: 12px; background: {p.surface2}; }}
+QMessageBox, QInputDialog {{ background: {p.surface}; }}
 QMessageBox QLabel {{ background: transparent; }}
 """
 
@@ -361,18 +468,165 @@ def qt_palette(p: Palette) -> QPalette:
     return pal
 
 
+# --------------------------------------------------------------------------
+# macOS-szerű elemek: betűtípus, színes elmosott háttér, lebegő üveg menük
+# --------------------------------------------------------------------------
+
+_FONT_CANDIDATES = (
+    "SF Pro Text",
+    ".AppleSystemUIFont",
+    "Segoe UI Variable Text",
+    "Segoe UI Variable",
+    "Inter",
+    "Helvetica Neue",
+    "Segoe UI",
+)
+
+
+def apply_font(app: QApplication) -> None:
+    families = set(QFontDatabase.families())
+    for name in _FONT_CANDIDATES:
+        if name in families:
+            font = QFont(name, 10)
+            font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
+            app.setFont(font)
+            return
+
+
+_backdrop_cache: dict[tuple, QPixmap] = {}
+
+
+def backdrop_pixmap(width: int, height: int) -> QPixmap:
+    """A macOS „vibrancy” hatását idéző háttér: lágy, elmosott színfoltok.
+
+    Erre kerülnek az áttetsző üvegpanelek, így azok enyhén átszínezve
+    „úsznak” a háttér felett. Méretenként gyorsítótárazva."""
+    p = _current
+    key = (p.name, width, height)
+    cached = _backdrop_cache.get(key)
+    if cached is not None:
+        return cached
+    if len(_backdrop_cache) > 6:
+        _backdrop_cache.clear()
+    pm = QPixmap(max(1, width), max(1, height))
+    pm.fill(QColor(p.bg))
+    painter = QPainter(pm)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(Qt.PenStyle.NoPen)
+    span = max(width, height)
+    spots = ((0.12, 0.08, 0.62), (0.88, 0.18, 0.55), (0.25, 0.95, 0.6), (0.85, 0.92, 0.5))
+    strength = 120 if p.name == "dark" else 150
+    for (fx, fy, fr), color in zip(spots, p.blobs):
+        cx, cy, r = fx * width, fy * height, fr * span
+        grad = QRadialGradient(QPointF(cx, cy), r)
+        c0 = QColor(color)
+        c0.setAlpha(strength)
+        c1 = QColor(color)
+        c1.setAlpha(0)
+        grad.setColorAt(0.0, c0)
+        grad.setColorAt(1.0, c1)
+        painter.setBrush(QBrush(grad))
+        painter.drawEllipse(QPointF(cx, cy), r, r)
+    painter.end()
+    _backdrop_cache[key] = pm
+    return pm
+
+
+def paint_glass(
+    painter: QPainter,
+    rect: QRectF,
+    radius: float = 14.0,
+    shadow: bool = True,
+    inset: bool = False,
+) -> None:
+    """Lebegő üvegpanel: puha árnyék, áttetsző kitöltés, finom keret és felső fény."""
+    p = _current
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(Qt.PenStyle.NoPen)
+    if shadow:
+        layers = 7
+        for i in range(layers, 0, -1):
+            a = int(p.shadow_alpha * (1 - i / (layers + 1)) ** 2 / 2.2)
+            painter.setBrush(QColor(0, 0, 0, a))
+            grow = i * 0.9
+            painter.drawRoundedRect(rect.adjusted(-grow, -grow + 2, grow, grow + 2), radius + grow, radius + grow)
+    painter.setBrush(qcolor(p.glass_inset if inset else p.glass))
+    painter.drawRoundedRect(rect, radius, radius)
+    # felső fényvisszaverődés
+    top = QLinearGradient(rect.topLeft(), QPointF(rect.left(), rect.top() + min(60.0, rect.height())))
+    hl = qcolor(p.glass_highlight)
+    top.setColorAt(0.0, QColor(hl.red(), hl.green(), hl.blue(), hl.alpha() // (3 if inset else 2)))
+    top.setColorAt(1.0, QColor(hl.red(), hl.green(), hl.blue(), 0))
+    painter.setBrush(QBrush(top))
+    painter.drawRoundedRect(rect, radius, radius)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.setPen(QPen(qcolor(p.glass_border), 1))
+    painter.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
+
+
+class _GlassPopupFilter(QObject):
+    """A menüket lekerekített, áttetsző („lebegő üveg”) ablakká teszi, és az új
+    ablakok rendszer-címsorát a témához igazítja."""
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if (
+            event.type() == QEvent.Type.Show
+            and isinstance(obj, QWidget)
+            and obj.isWindow()
+            and not isinstance(obj, QMenu)
+            and obj.property("_webkep_titlebar") != _current.name
+        ):
+            obj.setProperty("_webkep_titlebar", _current.name)
+            set_native_titlebar(obj, _current.name == "dark")
+        if event.type() == QEvent.Type.Polish and isinstance(obj, QMenu) and not obj.property("_webkep_glass"):
+            obj.setProperty("_webkep_glass", True)
+            obj.setWindowFlags(
+                obj.windowFlags() | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint
+            )
+            obj.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        return False
+
+
+_popup_filter: _GlassPopupFilter | None = None
+
+
+def set_native_titlebar(widget, dark: bool) -> None:
+    """Windows 10/11: sötét témánál a rendszer címsora is sötét legyen."""
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        hwnd = int(widget.winId())
+        value = ctypes.c_int(1 if dark else 0)
+        for attr in (20, 19):  # DWMWA_USE_IMMERSIVE_DARK_MODE (új és régi azonosító)
+            if ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(value), ctypes.sizeof(value)) == 0:
+                break
+    except Exception:
+        pass
+
+
 def apply_theme(app: QApplication, name: str) -> Palette:
-    global _current
+    global _current, _popup_filter
     _current = LIGHT if name == "light" else DARK
+    _backdrop_cache.clear()
+    if _popup_filter is None:
+        _popup_filter = _GlassPopupFilter(app)
+        app.installEventFilter(_popup_filter)
     app.setPalette(qt_palette(_current))
     app.setStyleSheet(stylesheet(_current))
+    for w in app.topLevelWidgets():
+        if w.isWindow() and w.isVisible() and not isinstance(w, QMenu):
+            w.setProperty("_webkep_titlebar", _current.name)
+            set_native_titlebar(w, _current.name == "dark")
+            w.update()
     return _current
 
 
 def checker_pixmap(size: int = 16) -> QPixmap:
     """Sakktábla-minta az átlátszó képrészek megjelenítéséhez."""
     p = _current
-    a, b = (QColor("#2a2e38"), QColor("#343945")) if p.name == "dark" else (QColor("#ffffff"), QColor("#e6e9ef"))
+    a, b = (QColor("#2a2a30"), QColor("#34343b")) if p.name == "dark" else (QColor("#ffffff"), QColor("#e8e8ed"))
     pm = QPixmap(size * 2, size * 2)
     pm.fill(a)
     painter = QPainter(pm)

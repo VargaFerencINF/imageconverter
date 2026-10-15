@@ -52,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     from . import theme
     from .main_window import MainWindow
 
+    theme.apply_font(app)
     theme.apply_theme(app, state.theme)
     app.setWindowIcon(theme.app_icon())
 

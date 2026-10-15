@@ -131,7 +131,7 @@ class SettingsPanel(QWidget):
         self.setMinimumWidth(widest + 28)
 
     def _card(self, title: str, icon_name: str | None = None) -> Card:
-        card = Card(title, icon_name=icon_name)
+        card = Card(title, icon_name=icon_name, inset=True)
         self._cards.append(card)
         return card
 
