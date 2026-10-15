@@ -1,6 +1,6 @@
 """WebKép Konverter – kötegelt WebP / AVIF képkonvertáló."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 APP_NAME = "WebKép Konverter"
 APP_ID = "WebKepKonverter"
